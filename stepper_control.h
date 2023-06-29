@@ -83,7 +83,7 @@ void setTimers() {
   cli();
 #if TICKS_PER_SECOND == 40000
   setTimer1(49); // 40kHz
-#elsif TICKS_PER_SECOND == 50000
+#elif TICKS_PER_SECOND == 50000
   setTimer1(39); // 50kHz
 #endif
   sei();

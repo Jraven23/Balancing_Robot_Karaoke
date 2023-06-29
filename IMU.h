@@ -106,6 +106,10 @@ float mpuGetAngle(){
   return ypr[1];
 }
 
+float mpuGetAngleYaw(){
+  return ypr[2];
+}
+
 void MPUsetup() {        
     // Iniciar MPU6050
     Serial.println(F("Initializing I2C devices..."));
