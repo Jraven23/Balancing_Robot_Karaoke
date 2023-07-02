@@ -72,11 +72,12 @@ void mpuInthandle() {
         Serial.println(ypr[2] * 180/M_PI);
 #endif
 
-#ifdef OUTPUT_READABLE_REALACCEL
-        //show acceleration without gravity 
+        //get linear acceleration (without gravity)
         mpu.dmpGetAccel(&accel_MPU, fifoBuffer);
         mpu.dmpGetGravity(&gravity_MPU, &q);
         mpu.dmpGetLinearAccel(&accelReal_MPU, &accel_MPU, &gravity_MPU); //removing gravity
+#ifdef OUTPUT_READABLE_REALACCEL
+        //show acceleration without gravity 
         Serial.print("Acceleration\t");
         Serial.print(accelReal_MPU.x);
         Serial.print("\t");
@@ -85,13 +86,10 @@ void mpuInthandle() {
         Serial.println(accelReal_MPU.z);
 #endif
 
+        mpu.dmpGetLinearAccelInWorld(&accelWorld_MPU, &accelReal_MPU, &q);
 #ifdef OUTPUT_READABLE_WORLDACCEL
         // display initial world-frame acceleration, adjusted to remove gravity
-        // and rotated based on known orientation from quaternion
-        mpu.dmpGetAccel(&accel_MPU, fifoBuffer);
-        mpu.dmpGetGravity(&gravity_MPU, &q);
-        mpu.dmpGetLinearAccel(&accelReal_MPU, &accel_MPU, &gravity_MPU); //removing gravity
-        mpu.dmpGetLinearAccelInWorld(&accelWorld_MPU, &accelReal_MPU, &q);
+        // and rotated based on known orientation from quaternion        
         Serial.print("Acceleration world\t");
         Serial.print(accelWorld_MPU.x);
         Serial.print("\t");
@@ -109,6 +107,11 @@ float mpuGetAngle(){
 float mpuGetAngleYaw(){
   return ypr[2];
 }
+
+float mpuGetXAcc(){
+  return accelReal_MPU.x;
+}
+
 
 void MPUsetup() {        
     // Iniciar MPU6050

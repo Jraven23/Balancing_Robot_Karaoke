@@ -64,9 +64,10 @@ void interpretCommand(char cCommand, RobotState &rState)
 
 //PID
 #define MAX_ACCEL (200)
-#define ANGLE_Kp  300 //450
-#define ANGLE_Kd  10
-#define ANGLE_Ki  10
+#define MAX_VEL (1500)
+#define Position_Kp  0.05 //300 //450
+#define Position_Kd  0.002 //10
+#define Position_Ki  0.002 //10
 
 #define STEERING_Kp  10 //450
 #define STEERING_Kd  1
@@ -93,8 +94,12 @@ bool isBalancing = false;
 
 float angle = 0.0;
 float targetAngle = 0.0;
-volatile float velocity = 0.0;
-float targetVelocity = 0.0;
+float Robot_Pos = 0.0;
+float targetPos = 0.0;
+float Robot_AccX = 0.0;
+float Robot_VelX = 0.0;
+volatile float wheel_velocity = 0.0;
+float targetWheelVelocity = 0.0;
 volatile float accel = 0.0;
 float steering = 0.0f;
 float targetSteering = 0.0;
@@ -102,9 +107,9 @@ float steeringVel = 0.0;
 float leftVelocity = 0.0;
 float rightVelocity =  0.0;
 
-PID anglePID(ANGLE_Kp, ANGLE_Kd, ANGLE_Ki, targetAngle);
+PID positionPID(Position_Kp, Position_Kd, Position_Ki, targetPos);
 PID steeringPID(STEERING_Kp, STEERING_Kd, STEERING_Ki, targetSteering);
-PID velocityPID(VELOCITY_Kp, VELOCITY_Kd, VELOCITY_Ki, targetVelocity);
+//PID velocityPID(VELOCITY_Kp, VELOCITY_Kd, VELOCITY_Ki, targetVelocity);
 
 unsigned long lastUpdateMicros = 0;
 
@@ -121,7 +126,6 @@ void updateControl(unsigned long nowMicros) {
   }
   mpuInthandle();
   angle = mpuGetAngle();
-  steering = mpuGetAngleYaw();
 
   float dt = ((float) (nowMicros - timestamp)) * 1e-6;
   if (abs(angle - targetAngle) < PI / 15) {
@@ -131,27 +135,51 @@ void updateControl(unsigned long nowMicros) {
   if (abs(angle - targetAngle) > PI / 4) {
     isBalancing = false;
     accel = 0.0;
-    velocity = 0.0;    
+    wheel_velocity = 0.0;    
   }
 
   if (!isBalancing) {
     return;
   }
 
+  /*
   if (rStateData.Forward)
     targetVelocity = rStateData.velocity;
   else if (rStateData.Backward)
     targetVelocity = rStateData.velocity;
   else
     targetVelocity = 0;
-    
-  //velocityPID.setTarget(targetVelocity);
-  //targetAnglePitch = -velocityPID.getControl(velocity, dt);
-  //anglePID.setTarget(targetAnglePitch);
 
-  velocity = anglePID.getControl(angle, dt);
-  //accel = constrain(accel, -MAX_ACCEL, MAX_ACCEL);
-  //velocity += accel * dt;
+  //velocityPID.setTarget(targetVelocity);
+  //targetAngle = -velocityPID.getControl(velocity, dt);
+  //anglePID.setTarget(targetAngle);
+  */
+
+  if (rStateData.Forward)
+  {
+    targetPos += rStateData.velocity*dt;
+    positionPID.setTarget(targetPos);
+  }
+  else if (rStateData.Backward)
+  {
+    targetPos -= rStateData.velocity*dt;
+    positionPID.setTarget(targetPos);
+  }
+
+  
+  // v(t) = v(t-1)+dt*a
+
+  Robot_AccX = mpuGetXAcc();
+  Robot_VelX += Robot_AccX*dt;
+  //Robot_Pos += Robot_VelX*dt;
+  Robot_Pos += Robot_VelX*dt + 0.5*Robot_AccX*dt*dt;
+
+  //Serial.print("Robot_Pos:");
+  //Serial.println(Robot_Pos);
+  accel = positionPID.getControl(Robot_Pos, dt);
+  accel = constrain(accel, -MAX_ACCEL, MAX_ACCEL);
+  wheel_velocity += accel * dt;
+  wheel_velocity = constrain(wheel_velocity, -MAX_VEL, MAX_VEL);
   
   if (rStateData.Right)
     targetSteering = -0.1*rStateData.velocity;
@@ -159,14 +187,13 @@ void updateControl(unsigned long nowMicros) {
     targetSteering = 0.1*rStateData.velocity;
   else
     targetSteering = 0;
-    
+
+  steering = mpuGetAngleYaw();
   steeringPID.setTarget(targetSteering);
   steeringVel = steeringPID.getControl(steering, dt);
-  //Serial.print("Steering vel: ");
-  //Serial.println(steeringVel);
  
-  leftVelocity = velocity - steeringVel;
-  rightVelocity = velocity + steeringVel;
+  leftVelocity = wheel_velocity - steeringVel;
+  rightVelocity = wheel_velocity + steeringVel;
   ticksPerPulseLeft = getTicksPerPulse(leftVelocity);
   ticksPerPulseRight = getTicksPerPulse(rightVelocity);
   
@@ -193,14 +220,14 @@ void setup() {
     setTimers();
     //CONTROL!
     Serial.println("Inverted Pendulum");
-    Serial.print("Angle_KP:");
-    Serial.print(ANGLE_Kp);
+    Serial.print("Position_Kp:");
+    Serial.print(Position_Kp);
     Serial.print(" ");
-    Serial.print("Angle_KD:");
-    Serial.print(ANGLE_Kd);
+    Serial.print("Position_Kd:");
+    Serial.print(Position_Kd);
     Serial.print(" ");
-    Serial.print("Angle_KI:");
-    Serial.print(ANGLE_Ki);
+    Serial.print("Position_Ki:");
+    Serial.print(Position_Ki);
     Serial.print(" ");
     Serial.print("Velocity_KP:");
     Serial.print(VELOCITY_Kp);
